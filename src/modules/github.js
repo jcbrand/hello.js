@@ -54,11 +54,14 @@
 			},
 
 			xhr: function(p) {
+				// Add required GitHub API headers
+				p.headers = p.headers || {};
+				p.headers['Authorization'] = 'Bearer ' + hello.utils.store('github').access_token;
+				p.headers['Accept'] = 'application/vnd.github+json';
+				p.headers['X-GitHub-Api-Version'] = '2022-11-28';
 
 				if (p.method !== 'get' && p.data) {
-
 					// Serialize payload as JSON
-					p.headers = p.headers || {};
 					p.headers['Content-Type'] = 'application/json';
 					if (typeof (p.data) === 'object') {
 						p.data = JSON.stringify(p.data);
