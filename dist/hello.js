@@ -516,42 +516,35 @@ hello.utils.extend(hello, {
 		// Add OAuth to state
 		// Where the service is going to take advantage of the oauth_proxy
 		if (!/\btoken\b/.test(responseType) ||
-		parseInt(provider.oauth.version, 10) < 2 ||
-		(opts.display === 'none' && provider.oauth.grant && session && session.refresh_token)) {
+				parseInt(provider.oauth.version, 10) < 2 ||
+				(opts.display === 'none' && provider.oauth.grant && session && session.refresh_token)) {
 
 			// Add the oauth endpoints
-			p.qs.state.oauth = provider.oauth;
-
+			const { auth, grant } = provider.oauth;
+			p.qs.state.oauth = { auth, grant };
 			// Add the proxy url
 			p.qs.state.oauth_proxy = opts.oauth_proxy;
-
 		}
 
 		// Convert state to a string
 		if (provider.oauth.base64_state) {
 			p.qs.state = window.btoa(JSON.stringify(p.qs.state));
-		}
-		else {
+		} else {
 			p.qs.state = encodeURIComponent(JSON.stringify(p.qs.state));
 		}
 
 		// URL
 		if (parseInt(provider.oauth.version, 10) === 1) {
-
 			// Turn the request to the OAuth Proxy for 3-legged auth
 			url = utils.qs(opts.oauth_proxy, p.qs, encodeFunction);
-		}
-
-		// Refresh token
-		else if (opts.display === 'none' && provider.oauth.grant && session && session.refresh_token) {
-
+		} else if (opts.display === 'none' && provider.oauth.grant && session && session.refresh_token) {
+			// Refresh token
 			// Add the refresh_token to the request
 			p.qs.refresh_token = session.refresh_token;
 
 			// Define the request path
 			url = utils.qs(opts.oauth_proxy, p.qs, encodeFunction);
-		}
-		else {
+		} else {
 			url = utils.qs(provider.oauth.auth, p.qs, encodeFunction);
 		}
 
@@ -1448,10 +1441,9 @@ hello.utils.extend(hello.utils, {
 
 	// OAuth and API response handler
 	responseHandler: function(window, parent) {
-
-		var _this = this;
-		var p;
-		var location = window.location;
+		let _this = this;
+		let p;
+		let location = window.location;
 
 		// Is this an auth relay message which needs to call the proxy?
 		p = _this.param(location.search);
@@ -1460,15 +1452,14 @@ hello.utils.extend(hello.utils, {
 		if (p && p.state && (p.code || p.oauth_token)) {
 
 			try {
-				var state = JSON.parse(p.state);
+				const state = p.state.startsWith('%7B') ? JSON.parse(p.state) : JSON.parse(atob(p.state));
 
 				// Add this path as the redirect_uri
 				p.redirect_uri = state.redirect_uri || location.href.replace(/[\?\#].*$/, '');
+				p.client_id = state.client_id;
 
 				// Redirect to the host
-				var path = _this.qs(state.oauth_proxy, p);
-
-
+				const path = _this.qs(state.oauth_proxy, p);
 				if (isValidUrl(path)) {
 					location.assign(path);
 				}
@@ -1495,8 +1486,7 @@ hello.utils.extend(hello.utils, {
 			// Remove any addition information
 			// E.g. p.state = 'facebook.page';
 			try {
-				var a = JSON.parse(p.state);
-				_this.extend(p, a);
+				_this.extend(p, p.state.startsWith('%7B') ? JSON.parse(p.state) : JSON.parse(atob(p.state)));
 			}
 			catch (e) {
 				var stateDecoded = decodeURIComponent(p.state);
@@ -1932,12 +1922,10 @@ hello.api = function() {
 	if ((m = url.match(/#(.+)/, ''))) {
 		url = url.split('#')[0];
 		p.path = m[1];
-	}
-	else if (url in actions) {
+	} else if (url in actions) {
 		p.path = url;
 		url = actions[url];
-	}
-	else if ('default' in actions) {
+	} else if ('default' in actions) {
 		url = actions['default'];
 	}
 
@@ -1956,8 +1944,7 @@ hello.api = function() {
 	if (typeof (url) === 'function') {
 		// Does self have its own callback?
 		url(p, getPath);
-	}
-	else {
+	} else {
 		// Else the URL is a string
 		getPath(url);
 	}

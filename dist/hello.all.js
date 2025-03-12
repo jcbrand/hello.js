@@ -516,42 +516,35 @@ hello.utils.extend(hello, {
 		// Add OAuth to state
 		// Where the service is going to take advantage of the oauth_proxy
 		if (!/\btoken\b/.test(responseType) ||
-		parseInt(provider.oauth.version, 10) < 2 ||
-		(opts.display === 'none' && provider.oauth.grant && session && session.refresh_token)) {
+				parseInt(provider.oauth.version, 10) < 2 ||
+				(opts.display === 'none' && provider.oauth.grant && session && session.refresh_token)) {
 
 			// Add the oauth endpoints
-			p.qs.state.oauth = provider.oauth;
-
+			const { auth, grant } = provider.oauth;
+			p.qs.state.oauth = { auth, grant };
 			// Add the proxy url
 			p.qs.state.oauth_proxy = opts.oauth_proxy;
-
 		}
 
 		// Convert state to a string
 		if (provider.oauth.base64_state) {
 			p.qs.state = window.btoa(JSON.stringify(p.qs.state));
-		}
-		else {
+		} else {
 			p.qs.state = encodeURIComponent(JSON.stringify(p.qs.state));
 		}
 
 		// URL
 		if (parseInt(provider.oauth.version, 10) === 1) {
-
 			// Turn the request to the OAuth Proxy for 3-legged auth
 			url = utils.qs(opts.oauth_proxy, p.qs, encodeFunction);
-		}
-
-		// Refresh token
-		else if (opts.display === 'none' && provider.oauth.grant && session && session.refresh_token) {
-
+		} else if (opts.display === 'none' && provider.oauth.grant && session && session.refresh_token) {
+			// Refresh token
 			// Add the refresh_token to the request
 			p.qs.refresh_token = session.refresh_token;
 
 			// Define the request path
 			url = utils.qs(opts.oauth_proxy, p.qs, encodeFunction);
-		}
-		else {
+		} else {
 			url = utils.qs(provider.oauth.auth, p.qs, encodeFunction);
 		}
 
@@ -1448,10 +1441,9 @@ hello.utils.extend(hello.utils, {
 
 	// OAuth and API response handler
 	responseHandler: function(window, parent) {
-
-		var _this = this;
-		var p;
-		var location = window.location;
+		let _this = this;
+		let p;
+		let location = window.location;
 
 		// Is this an auth relay message which needs to call the proxy?
 		p = _this.param(location.search);
@@ -1460,15 +1452,14 @@ hello.utils.extend(hello.utils, {
 		if (p && p.state && (p.code || p.oauth_token)) {
 
 			try {
-				var state = JSON.parse(p.state);
+				const state = p.state.startsWith('%7B') ? JSON.parse(p.state) : JSON.parse(atob(p.state));
 
 				// Add this path as the redirect_uri
 				p.redirect_uri = state.redirect_uri || location.href.replace(/[\?\#].*$/, '');
+				p.client_id = state.client_id;
 
 				// Redirect to the host
-				var path = _this.qs(state.oauth_proxy, p);
-
-
+				const path = _this.qs(state.oauth_proxy, p);
 				if (isValidUrl(path)) {
 					location.assign(path);
 				}
@@ -1495,8 +1486,7 @@ hello.utils.extend(hello.utils, {
 			// Remove any addition information
 			// E.g. p.state = 'facebook.page';
 			try {
-				var a = JSON.parse(p.state);
-				_this.extend(p, a);
+				_this.extend(p, p.state.startsWith('%7B') ? JSON.parse(p.state) : JSON.parse(atob(p.state)));
 			}
 			catch (e) {
 				var stateDecoded = decodeURIComponent(p.state);
@@ -1932,12 +1922,10 @@ hello.api = function() {
 	if ((m = url.match(/#(.+)/, ''))) {
 		url = url.split('#')[0];
 		p.path = m[1];
-	}
-	else if (url in actions) {
+	} else if (url in actions) {
 		p.path = url;
 		url = actions[url];
-	}
-	else if ('default' in actions) {
+	} else if ('default' in actions) {
 		url = actions['default'];
 	}
 
@@ -1956,8 +1944,7 @@ hello.api = function() {
 	if (typeof (url) === 'function') {
 		// Does self have its own callback?
 		url(p, getPath);
-	}
-	else {
+	} else {
 		// Else the URL is a string
 		getPath(url);
 	}
@@ -5307,7 +5294,8 @@ if (typeof chrome === 'object' && typeof chrome.identity === 'object' && chrome.
 				version: 2,
 				auth: 'https://x.com/i/oauth2/authorize',
 				grant: 'https://api.x.com/2/oauth2/token',
-				response_type: 'code'
+				response_type: 'code',
+				base64_state: true
 			},
 
 			// Authorization scopes
@@ -5327,6 +5315,15 @@ if (typeof chrome === 'object' && typeof chrome.identity === 'object' && chrome.
 
 				p.qs.code_challenge = 'challenge'; // Let's set this to an offline access to return a refresh_token
 				p.qs.code_challenge_method = 'plain';
+				p.qs.state.code_verifier = 'challenge';
+
+				// XXX: Delete some state vars to get the resulting b64 encoded string below 500 chars.
+				try {
+					delete p.qs.state.scope;
+					delete p.qs.state.display;
+					delete p.qs.state.redirect_url;
+					delete p.qs.state.state;
+				} catch (e) {}
 
 				this.oauth.auth = this.oauth.auth.replace(prefix, '') + (p.options.force ? prefix : '');
 			},
@@ -5406,7 +5403,6 @@ if (typeof chrome === 'object' && typeof chrome.identity === 'object' && chrome.
 			},
 
 			del: {
-
 				// See: https://dev.twitter.com/rest/reference/post/favorites/destroy
 				'me/like': function(p, callback) {
 					p.method = 'post';
@@ -5417,7 +5413,7 @@ if (typeof chrome === 'object' && typeof chrome.identity === 'object' && chrome.
 			},
 
 			wrap: {
-				me: function(res) {
+				me (res) {
 					formatError(res);
 					formatUser(res);
 					return res;
@@ -5427,7 +5423,7 @@ if (typeof chrome === 'object' && typeof chrome.identity === 'object' && chrome.
 				'me/followers': formatFriends,
 				'me/following': formatFriends,
 
-				'me/share': function(res) {
+				'me/share' (res) {
 					formatError(res);
 					paging(res);
 					if (!res.error && 'length' in res) {
@@ -5437,16 +5433,32 @@ if (typeof chrome === 'object' && typeof chrome.identity === 'object' && chrome.
 					return res;
 				},
 
-				'default': function(res) {
+				default (res) {
 					res = arrayToDataResponse(res);
 					paging(res);
 					return res;
 				}
 			},
 			xhr: function(p) {
+				debugger;
+				if (p.method === 'post') {
+					p.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+					p.proxy = true;
 
-				// Rely on the proxy for non-GET requests.
-				return (p.method !== 'get');
+					const data = p.data;
+					console.log(p.data);
+
+					/**
+--data-urlencode 'code=VGNibzFWSWREZm01bjN1N3dicWlNUG1oa2xRRVNNdmVHelJGY2hPWGxNd2dxOjE2MjIxNjA4MjU4MjU6MToxOmFjOjE' \
+--data-urlencode 'grant_type=authorization_code' \
+--data-urlencode 'client_id=rG9n6402A3dbUJKzXTNX4oWHJ' \
+--data-urlencode 'redirect_uri=https://www.example.com' \
+--data-urlencode 'code_verifier=challenge'
+					*/
+
+					return true;
+				}
+				return false;
 			}
 		}
 	});
@@ -5819,8 +5831,6 @@ if (typeof chrome === 'object' && typeof chrome.identity === 'object' && chrome.
 				auth: 'https://api.login.yahoo.com/oauth/v2/request_auth',
 				request: 'https://api.login.yahoo.com/oauth/v2/get_request_token',
 				token: 'https://api.login.yahoo.com/oauth/v2/get_token',
-				// Yahoo requires the state param to be base 64 encoded, hence the flag base64_state is set to true for Yahoo.
-				// Else uri encoding is used for all the other providers.
 				base64_state: true
 			},
 

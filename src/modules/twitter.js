@@ -11,7 +11,8 @@
 				version: 2,
 				auth: 'https://x.com/i/oauth2/authorize',
 				grant: 'https://api.x.com/2/oauth2/token',
-				response_type: 'code'
+				response_type: 'code',
+				base64_state: true
 			},
 
 			// Authorization scopes
@@ -25,14 +26,17 @@
 			scope_delim: '%20',
 
 			login (p) {
-				// Reauthenticate
-				// https://dev.twitter.com/oauth/reference/get/oauth/authenticate
-				const prefix = '?force_login=true';
-
 				p.qs.code_challenge = 'challenge'; // Let's set this to an offline access to return a refresh_token
 				p.qs.code_challenge_method = 'plain';
+				p.qs.state.code_verifier = 'challenge';
 
-				this.oauth.auth = this.oauth.auth.replace(prefix, '') + (p.options.force ? prefix : '');
+				// XXX: Delete some state vars to get the resulting b64 encoded string below 500 chars.
+				try {
+					delete p.qs.state.scope;
+					delete p.qs.state.display;
+					delete p.qs.state.redirect_url;
+					delete p.qs.state.state;
+				} catch (e) {}
 			},
 
 			base: base + '2/',
@@ -110,7 +114,6 @@
 			},
 
 			del: {
-
 				// See: https://dev.twitter.com/rest/reference/post/favorites/destroy
 				'me/like': function(p, callback) {
 					p.method = 'post';
@@ -121,7 +124,7 @@
 			},
 
 			wrap: {
-				me: function(res) {
+				me (res) {
 					formatError(res);
 					formatUser(res);
 					return res;
@@ -131,7 +134,7 @@
 				'me/followers': formatFriends,
 				'me/following': formatFriends,
 
-				'me/share': function(res) {
+				'me/share' (res) {
 					formatError(res);
 					paging(res);
 					if (!res.error && 'length' in res) {
@@ -141,16 +144,19 @@
 					return res;
 				},
 
-				'default': function(res) {
+				default (res) {
 					res = arrayToDataResponse(res);
 					paging(res);
 					return res;
 				}
 			},
 			xhr: function(p) {
-
-				// Rely on the proxy for non-GET requests.
-				return (p.method !== 'get');
+				if (p.method === 'post') {
+					p.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+					p.proxy = true;
+					return true;
+				}
+				return false;
 			}
 		}
 	});
