@@ -1,4 +1,4 @@
-/*! hellojs v1.20.0 - (c) 2012-2023 Andrew Dodson - MIT https://adodson.com/hello.js/LICENSE */
+/*! hellojs v1.20.0 - (c) 2012-2025 Andrew Dodson - MIT https://adodson.com/hello.js/LICENSE */
 // ES5 Object.create
 if (!Object.create) {
 
@@ -3918,11 +3918,14 @@ if (typeof chrome === 'object' && typeof chrome.identity === 'object' && chrome.
 			},
 
 			xhr: function(p) {
+				// Add required GitHub API headers
+				p.headers = p.headers || {};
+				p.headers['Authorization'] = 'Bearer ' + hello.utils.store('github').access_token;
+				p.headers['Accept'] = 'application/vnd.github+json';
+				p.headers['X-GitHub-Api-Version'] = '2022-11-28';
 
 				if (p.method !== 'get' && p.data) {
-
 					// Serialize payload as JSON
-					p.headers = p.headers || {};
 					p.headers['Content-Type'] = 'application/json';
 					if (typeof (p.data) === 'object') {
 						p.data = JSON.stringify(p.data);
@@ -5293,7 +5296,7 @@ if (typeof chrome === 'object' && typeof chrome.identity === 'object' && chrome.
 })(hello);
 (function(hello) {
 
-	var base = 'https://api.twitter.com/';
+	const base = 'https://api.x.com/';
 
 	hello.init({
 
@@ -5301,20 +5304,34 @@ if (typeof chrome === 'object' && typeof chrome.identity === 'object' && chrome.
 
 			// Ensure that you define an oauth_proxy
 			oauth: {
-				version: '1.0a',
-				auth: base + 'oauth/authenticate',
-				request: base + 'oauth/request_token',
-				token: base + 'oauth/access_token'
+				version: 2,
+				auth: 'https://x.com/i/oauth2/authorize',
+				grant: 'https://api.x.com/2/oauth2/token',
+				response_type: 'code'
 			},
 
-			login: function(p) {
+			// Authorization scopes
+			scope: {
+				basic: 'users.read',
+				friends: 'follows.read',
+				publish: 'tweet.write',
+				offline_access: 'offline.access'
+			},
+
+			scope_delim: '%20',
+
+			login (p) {
 				// Reauthenticate
 				// https://dev.twitter.com/oauth/reference/get/oauth/authenticate
-				var prefix = '?force_login=true';
+				const prefix = '?force_login=true';
+
+				p.qs.code_challenge = 'challenge'; // Let's set this to an offline access to return a refresh_token
+				p.qs.code_challenge_method = 'plain';
+
 				this.oauth.auth = this.oauth.auth.replace(prefix, '') + (p.options.force ? prefix : '');
 			},
 
-			base: base + '1.1/',
+			base: base + '2/',
 
 			get: {
 				me: 'account/verify_credentials.json',
