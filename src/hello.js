@@ -1755,8 +1755,7 @@ hello.api = function() {
 	// Provide a clean path
 	// Move the querystring into the data
 	if (p.method === 'get') {
-
-		var query = url.split(/[\?#]/)[1];
+		const query = url.split(/[\?#]/)[1];
 		if (query) {
 			utils.extend(p.query, utils.param(query));
 
@@ -1839,11 +1838,9 @@ hello.api = function() {
 				// Bad request? error statusCode or otherwise contains an error response vis JSONP?
 				if (typeof headers === 'object' ? (headers.statusCode >= 400) : (typeof r === 'object' && 'error' in r)) {
 					promise.reject(r);
-				}
-				else {
+				} else {
 					promise.fulfill(r);
 				}
-
 				return;
 			}
 
@@ -1878,14 +1875,11 @@ hello.api = function() {
 
 			// Is there a next_page defined in the response?
 			if (r && 'paging' in r && r.paging.next) {
-
 				// Add the relative path if it is missing from the paging/next path
 				if (r.paging.next[0] === '?') {
 					r.paging.next = p.path + r.paging.next;
-				}
-
-				// The relative path has been defined, lets markup the handler in the HashFragment
-				else {
+				} else {
+					// The relative path has been defined, lets markup the handler in the HashFragment
 					r.paging.next += '#' + p.path;
 				}
 			}
@@ -1894,8 +1888,7 @@ hello.api = function() {
 			// Emit events which pertain to the formatted response
 			if (!r || 'error' in r) {
 				promise.reject(r);
-			}
-			else {
+			} else {
 				promise.fulfill(r);
 			}
 		});

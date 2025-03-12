@@ -5309,13 +5309,12 @@ if (typeof chrome === 'object' && typeof chrome.identity === 'object' && chrome.
 			scope_delim: '%20',
 
 			login (p) {
-				// Reauthenticate
-				// https://dev.twitter.com/oauth/reference/get/oauth/authenticate
-				const prefix = '?force_login=true';
-
 				p.qs.code_challenge = 'challenge'; // Let's set this to an offline access to return a refresh_token
 				p.qs.code_challenge_method = 'plain';
-				p.qs.state.code_verifier = 'challenge';
+
+				// Instruct node-oauth-shim to pass an extra Authorization header when granting
+				// Authorization: basic base64(client_id:cient_secret)
+				p.qs.state.authorisation = 'header';
 
 				// XXX: Delete some state vars to get the resulting b64 encoded string below 500 chars.
 				try {
@@ -5324,14 +5323,12 @@ if (typeof chrome === 'object' && typeof chrome.identity === 'object' && chrome.
 					delete p.qs.state.redirect_url;
 					delete p.qs.state.state;
 				} catch (e) {}
-
-				this.oauth.auth = this.oauth.auth.replace(prefix, '') + (p.options.force ? prefix : '');
 			},
 
 			base: base + '2/',
 
 			get: {
-				me: 'account/verify_credentials.json',
+				me: '/users/me',
 				'me/friends': 'friends/list.json?count=@{limit|200}',
 				'me/following': 'friends/list.json?count=@{limit|200}',
 				'me/followers': 'followers/list.json?count=@{limit|200}',
@@ -5440,22 +5437,9 @@ if (typeof chrome === 'object' && typeof chrome.identity === 'object' && chrome.
 				}
 			},
 			xhr: function(p) {
-				debugger;
 				if (p.method === 'post') {
 					p.headers['Content-Type'] = 'application/x-www-form-urlencoded';
 					p.proxy = true;
-
-					const data = p.data;
-					console.log(p.data);
-
-					/**
---data-urlencode 'code=VGNibzFWSWREZm01bjN1N3dicWlNUG1oa2xRRVNNdmVHelJGY2hPWGxNd2dxOjE2MjIxNjA4MjU4MjU6MToxOmFjOjE' \
---data-urlencode 'grant_type=authorization_code' \
---data-urlencode 'client_id=rG9n6402A3dbUJKzXTNX4oWHJ' \
---data-urlencode 'redirect_uri=https://www.example.com' \
---data-urlencode 'code_verifier=challenge'
-					*/
-
 					return true;
 				}
 				return false;

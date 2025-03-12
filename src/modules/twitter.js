@@ -28,7 +28,10 @@
 			login (p) {
 				p.qs.code_challenge = 'challenge'; // Let's set this to an offline access to return a refresh_token
 				p.qs.code_challenge_method = 'plain';
-				p.qs.state.code_verifier = 'challenge';
+
+				// Instruct node-oauth-shim to pass an extra Authorization header when granting
+				// Authorization: basic base64(client_id:cient_secret)
+				p.qs.state.authorisation = 'header';
 
 				// XXX: Delete some state vars to get the resulting b64 encoded string below 500 chars.
 				try {
@@ -42,7 +45,7 @@
 			base: base + '2/',
 
 			get: {
-				me: 'account/verify_credentials.json',
+				me: '/users/me',
 				'me/friends': 'friends/list.json?count=@{limit|200}',
 				'me/following': 'friends/list.json?count=@{limit|200}',
 				'me/followers': 'followers/list.json?count=@{limit|200}',
@@ -150,13 +153,10 @@
 					return res;
 				}
 			},
-			xhr: function(p) {
-				if (p.method === 'post') {
-					p.headers['Content-Type'] = 'application/x-www-form-urlencoded';
-					p.proxy = true;
-					return true;
-				}
-				return false;
+			xhr (p) {
+				p.proxy = true;
+				p.proxy_response_type = 'proxy';
+				return true;
 			}
 		}
 	});
