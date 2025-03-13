@@ -15,6 +15,8 @@
 				base64_state: true
 			},
 
+			refresh: true, // Refresh the access_token once expired
+
 			// Authorization scopes
 			scope: {
 				basic: 'users.read',
@@ -26,7 +28,7 @@
 			scope_delim: '%20',
 
 			login (p) {
-				p.qs.code_challenge = 'challenge'; // Let's set this to an offline access to return a refresh_token
+				p.qs.code_challenge = 'challenge';
 				p.qs.code_challenge_method = 'plain';
 
 				// Instruct node-oauth-shim to pass an extra Authorization header when granting
@@ -45,7 +47,7 @@
 			base: base + '2/',
 
 			get: {
-				me: '/users/me',
+				me: 'users/me',
 				'me/friends': 'friends/list.json?count=@{limit|200}',
 				'me/following': 'friends/list.json?count=@{limit|200}',
 				'me/followers': 'followers/list.json?count=@{limit|200}',

@@ -40,7 +40,6 @@ hello.init({
 		},
 
 		xhr: function(p) {
-
 			p.proxy = true;
 			p.proxy_response_type = 'proxy';
 			return true;

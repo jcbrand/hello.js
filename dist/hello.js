@@ -624,18 +624,12 @@ hello.utils.extend(hello, {
 		p.authResponse = utils.store(p.name);
 
 		if (p.name && !(p.name in _this.services)) {
-
 			promise.reject(error('invalid_network', 'The network was unrecognized'));
-
-		}
-		else if (p.name && p.authResponse) {
-
+		} else if (p.name && p.authResponse) {
 			// Define the callback
-			var callback = function(opts) {
-
+			const callback = function(opts) {
 				// Remove from the store
 				utils.store(p.name, null);
-
 				// Emit events by default
 				promise.fulfill(hello.utils.merge({network: p.name}, opts || {}));
 			};
@@ -1452,7 +1446,7 @@ hello.utils.extend(hello.utils, {
 		if (p && p.state && (p.code || p.oauth_token)) {
 
 			try {
-				const state = p.state.startsWith('%7B') ? JSON.parse(p.state) : JSON.parse(atob(p.state));
+				const state = p.state.startsWith('{') ? JSON.parse(p.state) : JSON.parse(atob(p.state));
 
 				// Add this path as the redirect_uri
 				p.redirect_uri = state.redirect_uri || location.href.replace(/[\?\#].*$/, '');
@@ -1486,7 +1480,7 @@ hello.utils.extend(hello.utils, {
 			// Remove any addition information
 			// E.g. p.state = 'facebook.page';
 			try {
-				_this.extend(p, p.state.startsWith('%7B') ? JSON.parse(p.state) : JSON.parse(atob(p.state)));
+				_this.extend(p, p.state.startsWith('{') ? JSON.parse(p.state) : JSON.parse(atob(p.state)));
 			}
 			catch (e) {
 				var stateDecoded = decodeURIComponent(p.state);
@@ -1852,25 +1846,20 @@ hello.api = function() {
 
 	// PATH
 	// As long as the path isn't flagged as unavaiable, e.g. path == false
-
 	if (!(!(p.method in o) || !(p.path in o[p.method]) || o[p.method][p.path] !== false)) {
 		return promise.reject(error('invalid_path', 'The provided path is not available on the selected network'));
 	}
 
 	// PROXY
 	// OAuth1 calls always need a proxy
-
-	if (!p.oauth_proxy) {
-		p.oauth_proxy = _this.settings.oauth_proxy;
-	}
+	p.oauth_proxy = p.oauth_proxy || _this.settings.oauth_proxy;
 
 	if (!('proxy' in p)) {
-		p.proxy = p.oauth_proxy && o.oauth && parseInt(o.oauth.version, 10) === 1;
+		p.proxy = p.oauth_proxy && (o.oauth && parseInt(o.oauth.version, 10) === 1 || p.network === 'twitter');
 	}
 
 	// TIMEOUT
 	// Adopt timeout from global settings by default
-
 	if (!('timeout' in p)) {
 		p.timeout = _this.settings.timeout;
 	}
@@ -1884,8 +1873,10 @@ hello.api = function() {
 	// Get the current session
 	// Append the access_token to the query
 	p.authResponse = _this.getAuthResponse(p.network);
-	if (p.authResponse && p.authResponse.access_token) {
-		p.query.access_token = p.authResponse.access_token;
+	if (p.network !== 'twitter') {
+		if (p.authResponse && p.authResponse.access_token) {
+			p.query.access_token = p.authResponse.access_token;
+		}
 	}
 
 	var url = p.path;
@@ -1908,8 +1899,7 @@ hello.api = function() {
 	// Provide a clean path
 	// Move the querystring into the data
 	if (p.method === 'get') {
-
-		var query = url.split(/[\?#]/)[1];
+		const query = url.split(/[\?#]/)[1];
 		if (query) {
 			utils.extend(p.query, utils.param(query));
 
@@ -1981,30 +1971,30 @@ hello.api = function() {
 		// Define the request URL
 		p.url = url;
 
-		// Make the HTTP request with the curated request object
-		// CALLBACK HANDLER
-		// @ response object
-		// @ statusCode integer if available
-		utils.request(p, function(r, headers) {
+		// FIXME: can this go into the Twitter module somehow?
+		if (p.network === 'twitter') {
+			p.headers = {
+				Authorization: `Bearer ${p.authResponse.access_token}`,
+			};
+		}
 
+		// Make the HTTP request with the curated request object
+		utils.request(p, function(r, headers) {
 			// Is this a raw response?
 			if (!p.formatResponse) {
 				// Bad request? error statusCode or otherwise contains an error response vis JSONP?
 				if (typeof headers === 'object' ? (headers.statusCode >= 400) : (typeof r === 'object' && 'error' in r)) {
 					promise.reject(r);
-				}
-				else {
+				} else {
 					promise.fulfill(r);
 				}
-
 				return;
 			}
 
 			// Should this be an object
 			if (r === true) {
 				r = {success: true};
-			}
-			else if (!r) {
+			} else if (!r) {
 				r = {};
 			}
 
@@ -2031,14 +2021,11 @@ hello.api = function() {
 
 			// Is there a next_page defined in the response?
 			if (r && 'paging' in r && r.paging.next) {
-
 				// Add the relative path if it is missing from the paging/next path
 				if (r.paging.next[0] === '?') {
 					r.paging.next = p.path + r.paging.next;
-				}
-
-				// The relative path has been defined, lets markup the handler in the HashFragment
-				else {
+				} else {
+					// The relative path has been defined, lets markup the handler in the HashFragment
 					r.paging.next += '#' + p.path;
 				}
 			}
@@ -2047,8 +2034,7 @@ hello.api = function() {
 			// Emit events which pertain to the formatted response
 			if (!r || 'error' in r) {
 				promise.reject(r);
-			}
-			else {
+			} else {
 				promise.fulfill(r);
 			}
 		});
@@ -2073,16 +2059,14 @@ hello.utils.extend(hello.utils, {
 		}
 
 		// Check if the browser and service support CORS
-		var cors = this.request_cors(function() {
+		const cors = this.request_cors(function() {
 			// If it does then run this...
 			return ((p.xhr === undefined) || (p.xhr && (typeof (p.xhr) !== 'function' || p.xhr(p, p.query))));
 		});
 
 		if (cors) {
-
 			formatUrl(p, function(url) {
-
-				var x = _this.xhr(p.method, url, p.headers, p.data, callback);
+				const x = _this.xhr(p.method, url, p.headers, p.data, callback);
 				x.onprogress = p.onprogress || null;
 
 				// Windows Phone does not support xhr.upload, see #74
@@ -2092,7 +2076,6 @@ hello.utils.extend(hello.utils, {
 				}
 
 			});
-
 			return;
 		}
 
@@ -2118,70 +2101,32 @@ hello.utils.extend(hello.utils, {
 
 			// Lets use JSONP if the method is 'get'
 			if (p.method === 'get') {
-
 				formatUrl(p, function(url) {
 					_this.jsonp(url, callback, p.callbackID, p.timeout);
 				});
-
 				return;
-			}
-			else {
+			} else {
 				// It's not compatible reset query
 				p.query = _query;
-			}
-
-		}
-
-		// Otherwise we're on to the old school, iframe hacks and JSONP
-		if (p.form !== false) {
-
-			// Add some additional query parameters to the URL
-			// We're pretty stuffed if the endpoint doesn't like these
-			p.query.redirect_uri = p.redirect_uri;
-			p.query.state = JSON.stringify({callback: p.callbackID});
-
-			var opts;
-
-			if (typeof (p.form) === 'function') {
-
-				// Format the request
-				opts = p.form(p, p.query);
-			}
-
-			if (p.method === 'post' && opts !== false) {
-
-				formatUrl(p, function(url) {
-					_this.post(url, p.data, opts, callback, p.callbackID, p.timeout);
-				});
-
-				return;
 			}
 		}
 
 		// None of the methods were successful throw an error
 		callback(error('invalid_request', 'There was no mechanism for handling this request'));
-
 		return;
 
 		// Format URL
 		// Constructs the request URL, optionally wraps the URL through a call to a proxy server
 		// Returns the formatted URL
 		function formatUrl(p, callback) {
-
 			// Are we signing the request?
 			var sign;
 
 			// OAuth1
 			// Remove the token from the query before signing
 			if (p.authResponse && p.authResponse.oauth && parseInt(p.authResponse.oauth.version, 10) === 1) {
-
-				// OAUTH SIGNING PROXY
 				sign = p.query.access_token;
-
-				// Remove the access_token
 				delete p.query.access_token;
-
-				// Enfore use of Proxy
 				p.proxy = true;
 			}
 
@@ -2192,8 +2137,7 @@ hello.utils.extend(hello.utils, {
 				p.data = null;
 			}
 
-			// Construct the path
-			var path = _this.qs(p.url, p.query);
+			let path = _this.qs(p.url, p.query);
 
 			// Proxy the request through a server
 			// Used for signing OAuth1
@@ -2689,9 +2633,9 @@ hello.utils.extend(hello.utils, {
 
 		return data instanceof Object && (
 			(this.domInstance('input', data) && data.type === 'file') ||
-		('FileList' in window && data instanceof window.FileList) ||
-		('File' in window && data instanceof window.File) ||
-		('Blob' in window && data instanceof window.Blob));
+			('FileList' in window && data instanceof window.FileList) ||
+			('File' in window && data instanceof window.File) ||
+			('Blob' in window && data instanceof window.Blob));
 
 	},
 
@@ -2735,11 +2679,11 @@ hello.utils.extend(hello.utils, {
 			// Is data a form object
 			if (_this.domInstance('form', data)) {
 				data = _this.nodeListToJSON(data.elements);
-			}
-			else if ('NodeList' in w && data instanceof NodeList) {
+
+			} else if ('NodeList' in w && data instanceof NodeList) {
 				data = _this.nodeListToJSON(data);
-			}
-			else if (_this.domInstance('input', data)) {
+
+			} else if (_this.domInstance('input', data)) {
 				data = _this.nodeListToJSON([data]);
 			}
 
@@ -2759,16 +2703,13 @@ hello.utils.extend(hello.utils, {
 						if (data[x].length === 1) {
 							data[x] = data[x][0];
 						}
-					}
-					else if (_this.domInstance('input', data[x]) && data[x].type === 'file') {
+					} else if (_this.domInstance('input', data[x]) && data[x].type === 'file') {
 						continue;
-					}
-					else if (_this.domInstance('input', data[x]) ||
+					} else if (_this.domInstance('input', data[x]) ||
 						_this.domInstance('select', data[x]) ||
 						_this.domInstance('textArea', data[x])) {
 						data[x] = data[x].value;
-					}
-					else if (_this.domInstance(null, data[x])) {
+					} else if (_this.domInstance(null, data[x])) {
 						data[x] = data[x].innerHTML || data[x].innerText;
 					}
 				}
@@ -2781,43 +2722,35 @@ hello.utils.extend(hello.utils, {
 		// NodeListToJSON
 		// Given a list of elements extrapolate their values and return as a json object
 		nodeListToJSON: function(nodelist) {
-
-			var json = {};
+			const json = {};
 
 			// Create a data string
 			for (var i = 0; i < nodelist.length; i++) {
-
-				var input = nodelist[i];
+				const input = nodelist[i];
 
 				// If the name of the input is empty or diabled, dont add it.
-				if (input.disabled || !input.name) {
-					continue;
-				}
+				if (input.disabled || !input.name) continue;
 
 				// Is this a file, does the browser not support 'files' and 'FormData'?
 				if (input.type === 'file') {
 					json[input.name] = input;
-				}
-				else {
+				} else {
 					json[input.name] = input.value || input.innerHTML;
 				}
 			}
-
 			return json;
 		}
 	});
 
 	// Replace it
 	hello.api = function() {
-
 		// Get arguments
-		var p = utils.args({path: 's!', method: 's', data: 'o', timeout: 'i', callback: 'f'}, arguments);
+		const p = utils.args({path: 's!', method: 's', data: 'o', timeout: 'i', callback: 'f'}, arguments);
 
 		// Change for into a data object
 		if (p.data) {
 			utils.dataToJSON(p);
 		}
-
 		return api.call(this, p);
 	};
 
