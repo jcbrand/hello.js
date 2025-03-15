@@ -434,7 +434,7 @@ hello.utils.extend(hello, {
 		// Scopes (authentication permisions)
 		// Ensure this is a string - IE has a problem moving Arrays between windows
 		// Append the setup scope
-		var SCOPE_SPLIT = /[,\s]+/;
+		const SCOPE_SPLIT = /[,\s]+/;
 
 		// Include default scope settings (cloned).
 		var scope = _this.settings.scope ? [_this.settings.scope.toString()] : [];
@@ -450,7 +450,7 @@ hello.utils.extend(hello, {
 		// Append scopes from a previous session.
 		// This helps keep app credentials constant,
 		// Avoiding having to keep tabs on what scopes are authorized
-		if (session && 'scope' in session && session.scope instanceof String) {
+		if (session && 'scope' in session && typeof session.scope === 'string') {
 			scope.push(session.scope);
 		}
 
@@ -1457,7 +1457,6 @@ hello.utils.extend(hello.utils, {
 				if (isValidUrl(path)) {
 					location.assign(path);
 				}
-
 				return;
 			}
 			catch (e) {
@@ -1495,7 +1494,6 @@ hello.utils.extend(hello.utils, {
 
 			// Access_token?
 			if (('access_token' in p && p.access_token) && p.network) {
-
 				if (!p.expires_in || parseInt(p.expires_in, 10) === 0) {
 					// If p.expires_in is unset, set to 0
 					p.expires_in = 0;
@@ -1651,9 +1649,8 @@ hello.utils.Event.call(hello);
 ///////////////////////////////////
 
 (function(hello) {
-
 	// Monitor for a change in state and fire
-	var oldSessions = {};
+	const oldSessions = {};
 
 	// Hash of expired tokens
 	var expired = {};
@@ -1666,9 +1663,8 @@ hello.utils.Event.call(hello);
 	});
 
 	(function self() {
-
-		var CURRENT_TIME = ((new Date()).getTime() / 1e3);
-		var emit = function(eventName) {
+		const CURRENT_TIME = ((new Date()).getTime() / 1e3);
+		const emit = function(eventName) {
 			hello.emit('auth.' + eventName, {
 				network: name,
 				authResponse: session
@@ -1710,11 +1706,10 @@ hello.utils.Event.call(hello);
 			}
 
 			// Refresh token
-			if (session && ('expires' in session) && session.expires < CURRENT_TIME) {
-
+			if (session && ('expires' in session) && (session.expires < CURRENT_TIME || true)) {
 				// If auto refresh is possible
 				// Either the browser supports
-				var refresh = provider.refresh || session.refresh_token;
+				const refresh = provider.refresh || session.refresh_token;
 
 				// Has the refresh been run recently?
 				if (refresh && (!(name in expired) || expired[name] < CURRENT_TIME)) {
@@ -1738,8 +1733,7 @@ hello.utils.Event.call(hello);
 			}
 
 			// Has session changed?
-			else if (oldSess.access_token === session.access_token &&
-			oldSess.expires === session.expires) {
+			else if (oldSess.access_token === session.access_token && oldSess.expires === session.expires) {
 				continue;
 			}
 
@@ -2185,7 +2179,7 @@ hello.utils.extend(hello.utils, {
 			return data instanceof window.Element && (!type || (data.tagName && data.tagName.toLowerCase() === type));
 		}
 		else {
-			return (!(data instanceof Object || data instanceof Array || data instanceof String || data instanceof Number) && data.tagName && data.tagName.toLowerCase() === type);
+			return (!(data instanceof Object || Array.isArray(data) || typeof data === 'string' || data instanceof Number) && data.tagName && data.tagName.toLowerCase() === type);
 		}
 	},
 
