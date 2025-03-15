@@ -1609,7 +1609,7 @@ hello.utils.Event.call(hello);
 		}}
 
 		// Check error events
-		setTimeout(self, 1000);
+		setTimeout(self, 3000);
 	})();
 
 })(hello);
